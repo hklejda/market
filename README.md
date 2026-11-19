@@ -1,26 +1,31 @@
 # Live Supermarket
 
-A walkable 3D supermarket in the browser, built with Three.js. You walk the aisles, browse real products, and add them to a cart.
+A walkable 3D supermarket in the browser, built with Three.js, stocked with the **full SPAR Albania online catalogue**: about 3,000 real products with their photos, names and prices in Lek.
+
+**Live:** https://hklejda.github.io/market/
 
 ## Features
-- 6 sections (Fruta & Perime, Bulmet, Ushqime, Pije, Ëmbëlsira, Shtëpia) with 120 real products
-- Real product photos, names and prices in Lek from SPAR Albania's online shop (shop.spar.al), collected on 19 Nov 2026
-- Click a product to see its photo and price, add it to the cart, or open its page on shop.spar.al
-- Cart with checkout, a minimap you can click to walk, and section shortcuts
-- Desktop (drag + W A S D) and mobile (joystick + drag) controls
+- Every SPAR product that has a photo and a price, laid out automatically into aisles by category
+- Search any product and jump straight to its shelf
+- Click a product for its photo, price and a link to its page on shop.spar.al, then add it to the cart
+- Category shortcuts, a clickable minimap and an aisle label that shows where you are
+- Sharp photos load for the aisles near you and lighter ones for the rest, so it stays fast
+- Desktop (drag + W A S D, Shift to run) and mobile (joystick + drag) controls
+
+## How the catalogue is built
+`tools/build_catalog.py` crawls shop.spar.al, cuts each product photo out of its white background and packs the photos into WebP sheets:
+
+- `catalog/catalog.json`: sections, categories and products (`[name, price, slug, category, sheet, tile]`)
+- `catalog/sheet_NNN.webp`: 2048×2048 sheets of 8×8 photos, 256 px each
+- `catalog/sheet_NNN_s.webp`: the same sheets at 512×512, for distant shelves
+
+The GitHub Action `.github/workflows/catalog.yml` runs the builder **every Monday** and commits the result, so prices and products stay current. You can also run it by hand from the Actions tab ("Build SPAR catalogue" → Run workflow).
 
 ## Run locally
-The page loads its photo files, so serve the folder rather than opening the file directly:
-
 ```bash
 python -m http.server 8000
 # open http://localhost:8000
 ```
 
-## Files
-- `index.html`: the whole app (HTML, CSS and JavaScript; Three.js r128 from cdnjs)
-- `atlas0.jpg` to `atlas11.jpg`: product photo sheets, 10 products per sheet in a 5×2 grid of 256px tiles. Sheet `n` holds products 1–10 of section `n`, and sheet `n+6` holds products 11–20.
-- `tools/spar_export.py`: optional script to download more products from shop.spar.al
-
 ## Note
-The product photos come from SPAR Albania's shop and the brands. Get permission before using them publicly or commercially.
+Product photos and names belong to SPAR Albania and the brands. This is a personal prototype. Get permission before using it commercially.
