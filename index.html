@@ -367,7 +367,7 @@ map.addEventListener('click',e=>{const r=map.getBoundingClientRect();const x=XMI
 const aisleEl=$('aisle');let lastAisle='';
 function updateAisle(){let best=null,bd=4.5;racks.forEach(rk=>{if(Math.abs(player.z-rk.z)>8.5)return;[[1,rk.sides[0]],[-1,rk.sides[1]]].forEach(([s,sd])=>{if(!sd)return;const d=Math.abs(player.x-(rk.x+s*0.6));if((player.x-rk.x)*s>0&&d<bd){bd=d;best=sd;}});});
  const key=best?best.sec.name+'|'+best.items[0].cat:'';if(key===lastAisle)return;lastAisle=key;
- if(best){const cats=[...new Set(best.items.map(p=>p.cat))];aisleEl.textContent=`${best.sec.name} · ${cats.slice(0,3).join(', ')}${cats.length>3?'…':''}`;aisleEl.style.background=best.sec.color;aisleEl.style.display='block';}else aisleEl.style.display='none';}
+ if(best){const cats=[...new Set(best.items.map(p=>p.cat))].filter(c=>c!==best.sec.name);aisleEl.textContent=best.sec.name+(cats.length?' · '+cats.slice(0,3).join(', ')+(cats.length>3?'…':''):'');aisleEl.style.background=best.sec.color;aisleEl.style.display='block';}else aisleEl.style.display='none';}
 
 $('enter').onclick=()=>{$('overlay').remove();feed(`🏪 ${products.length.toLocaleString()} products on the shelves. Use search to find anything.`);};
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
