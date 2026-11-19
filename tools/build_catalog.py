@@ -23,7 +23,7 @@ from scipy import ndimage
 
 BASE = "https://shop.spar.al"
 OUT = "catalog"
-TILE, GRID = 256, 8
+TILE, GRID, SMALL = 256, 8, 64   # full tiles 256 px, distant-shelf tiles 64 px
 PER_SHEET = GRID * GRID
 HEAD = {"User-Agent": "Mozilla/5.0 (LiveSupermarket catalogue builder; github.com/hklejda/market)"}
 CROSS_LISTS = {"produkte-spar", "produkte-italiane", "oferta", "te-pakategorizuara"}
@@ -212,13 +212,18 @@ def main():
         if f.startswith("sheet_"):
             os.remove(os.path.join(OUT, f))
 
+    def save(sheet, n):
+        sheet.save(f"{OUT}/sheet_{n:03d}.webp", "WEBP", quality=82, method=6)
+        small = sheet.resize((SMALL * GRID, SMALL * GRID), Image.LANCZOS)
+        small.save(f"{OUT}/sheet_{n:03d}_s.webp", "WEBP", quality=80, method=6)
+
     out_products = []
     sheet = None
     for i, (p, ph) in enumerate(kept):
         s, t = divmod(i, PER_SHEET)
         if t == 0:
             if sheet is not None:
-                sheet.save(f"{OUT}/sheet_{s - 1:03d}.webp", "WEBP", quality=82, method=6)
+                save(sheet, s - 1)
             sheet = Image.new("RGBA", (TILE * GRID, TILE * GRID), (255, 255, 255, 0))
         cx, cy = (t % GRID) * TILE, (t // GRID) * TILE
         sheet.paste(ph, (cx + (TILE - ph.width) // 2, cy + TILE - ph.height - 4), ph)
@@ -231,12 +236,12 @@ def main():
             categories.append({"path": p["path"], "name": p["cname"], "section": sections[p["skey"]]})
         out_products.append([p["name"], p["price"], p["slug"], cat_index[p["path"]], s, t])
     if sheet is not None:
-        sheet.save(f"{OUT}/sheet_{(len(kept) - 1) // PER_SHEET:03d}.webp", "WEBP", quality=82, method=6)
+        save(sheet, (len(kept) - 1) // PER_SHEET)
 
     data = {
         "source": BASE,
         "updated": time.strftime("%Y-%m-%d"),
-        "tile": TILE, "grid": GRID,
+        "tile": TILE, "grid": GRID, "small": SMALL,
         "sheets": (len(kept) + PER_SHEET - 1) // PER_SHEET,
         "sections": sec_order,
         "categories": categories,
