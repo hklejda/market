@@ -1,0 +1,48 @@
+name: Build SPAR catalogue
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - tools/build_catalog.py
+      - .github/workflows/catalog.yml
+  schedule:
+    - cron: "17 3 * * 1"   # every Monday, 04:17 Tirana time
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 pillow numpy scipy
+
+      - name: Build catalogue
+        run: python tools/build_catalog.py
+
+      - name: Commit catalogue
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update SPAR catalogue ($(date +%Y-%m-%d))"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
