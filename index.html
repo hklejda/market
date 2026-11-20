@@ -132,7 +132,7 @@ const sides=[]; // {sec, items:[product]}
 sections.forEach(sec=>{const list=products.filter(p=>p.sec===sec);for(let k=0;k<list.length;k+=PER_SIDE)sides.push({sec,items:list.slice(k,k+PER_SIDE)});});
 const nRacks=Math.ceil(sides.length/2), nRows=Math.ceil(nRacks/ROW_N);
 const rackX=j=>(j-(ROW_N-1)/2)*DX, rowZ=r=>-r*ROW_DZ;
-const racks=[];for(let i=0;i<nRacks;i++){const r=Math.floor(i/ROW_N),j=r%2?ROW_N-1-(i%ROW_N):i%ROW_N;racks.push({x:rackX(j),z:rowZ(r),row:r,sides:[sides[2*i]||null,sides[2*i+1]||null]});}
+const racks=[];for(let i=0;i<nRacks;i++){const r=Math.floor(i/ROW_N),j=r%2?ROW_N-1-(i%ROW_N):i%ROW_N;racks.push({x:rackX(j),z:rowZ(r),row:r,sides:[sides[2*i],sides[2*i+1]||sides[2*i]]});}
 const XMIN=rackX(0)-DX/2-1.5, XMAX=rackX(ROW_N-1)+DX/2+1.5, ZMAX=17, ZMIN=rowZ(nRows-1)-8-6;
 const CORR=[];for(let j=0;j<=ROW_N;j++)CORR.push(rackX(j)-DX/2);
 const CROSS=[10];for(let r=0;r<nRows;r++)CROSS.push(rowZ(r)-11);CROSS[CROSS.length-1]=rowZ(nRows-1)-10.5;
@@ -207,14 +207,14 @@ const tM=new THREE.Matrix4(),tQ=new THREE.Quaternion(),tP=new THREE.Vector3(),tS
 const sheetUnits=[...Array(CAT.sheets)].map(()=>[]), crateM=[];
 racks.forEach(rk=>[[1,rk.sides[0]],[-1,rk.sides[1]]].forEach(([s,sd])=>{if(!sd)return;
  const fruit=/fruta/.test(sd.sec.key), ry=s>0?Math.PI/2:-Math.PI/2;
- sd.items.forEach((p,k)=>{const slot=Math.floor(k/LEVELS.length),L=LEVELS[k%LEVELS.length],zc=rk.z-7.2+slot*1.6,px=rk.x+s*0.4;
-  p.rack=rk;p.side=s;p.z=zc;p.level=L;
+ const n=sd.items.length;for(let k=0;k<PER_SIDE;k++){const p=sd.items[Math.floor(k*n/PER_SIDE)];const slot=Math.floor(k/LEVELS.length),L=LEVELS[k%LEVELS.length],zc=rk.z-7.2+slot*1.6,px=rk.x+s*0.4;
+  if(!p.rack){p.rack=rk;p.side=s;p.z=zc;p.level=L;}
   FACE.forEach(fo=>{const z=zc+fo;
    if(fruit){tM.compose(tP.set(rk.x+s*0.32,L+0.06,z),tQ.identity(),tS.set(1,1,1));crateM.push(tM.clone());}
    DEPTH.forEach(d=>{tQ.setFromAxisAngle(UP,ry);const sc=fruit?0.95:1;tM.compose(tP.set(px-s*d,L+(fruit?0.33:0.22),z),tQ,tS.set(sc,sc,sc));
     const u={p,m:tM.clone(),alive:true,id:sheetUnits[p.sheet].length};sheetUnits[p.sheet].push(u);p.units.push(u);});
   });
- });
+ }
 }));
 if(crateM.length){const cr=new THREE.InstancedMesh(new THREE.BoxGeometry(0.45,0.12,0.48),new THREE.MeshLambertMaterial({color:0xa1734a}),crateM.length);crateM.forEach((m,i)=>cr.setMatrixAt(i,m));cr.frustumCulled=false;scene.add(cr);}
 
@@ -233,17 +233,17 @@ for(let i=0;i<CAT.sheets;i++){
  mesh.frustumCulled=false;mesh.userData.sheet=i;mesh.visible=false;scene.add(mesh);
  // bounding box of this sheet's products (for near/far photo quality)
  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;units.forEach(u=>{const e=u.m.elements;x0=Math.min(x0,e[12]);x1=Math.max(x1,e[12]);z0=Math.min(z0,e[14]);z1=Math.max(z1,e[14]);});
- geo.boundingSphere=new THREE.Sphere(new THREE.Vector3((x0+x1)/2,1.2,(z0+z1)/2),Math.hypot(x1-x0,z1-z0)/2+1.6);mesh.frustumCulled=true;
- const S={i,mesh,mat,units,box:[x0,x1,z0,z1],lo:null,hi:null,hiLoading:false};sheets.push(S);
+ const S={i,mesh,mat,units,box:[x0,x1,z0,z1],sphere:new THREE.Sphere(new THREE.Vector3((x0+x1)/2,1.2,(z0+z1)/2),Math.hypot(x1-x0,z1-z0)/2+1.6),ready:false,lo:null,hi:null,hiLoading:false};sheets.push(S);
 }
 const pickables=sheets.filter(Boolean).map(s=>s.mesh), pickList=pickables.concat(occluders);
 function prepTex(t){t.anisotropy=ANISO;return t;}
 let loadedLo=0;const loSheets=sheets.filter(Boolean);
-loSheets.forEach(S=>loader.load(sheetName(S.i,true),t=>{S.lo=prepTex(t);if(!S.hi){S.mat.map=t;S.mat.needsUpdate=true;}S.mesh.visible=true;
- loadedLo++;$('enter').textContent=loadedLo<loSheets.length?`Loading shelves… ${Math.round(loadedLo/loSheets.length*100)}%`:'Enter the store';if(loadedLo>=Math.min(loSheets.length,6))$('enter').disabled=false;},undefined,()=>{loadedLo++;}));
+function loadLo(S,retry){loader.load(sheetName(S.i,true)+(retry?'?r=1':''),t=>{S.lo=prepTex(t);if(!S.hi){S.mat.map=t;S.mat.needsUpdate=true;}S.ready=true;
+ loadedLo++;$('enter').textContent=loadedLo<loSheets.length?`Loading shelves… ${Math.round(loadedLo/loSheets.length*100)}%`:'Enter the store';if(loadedLo>=Math.min(loSheets.length,6))$('enter').disabled=false;},undefined,()=>{if(!retry)setTimeout(()=>loadLo(S,true),1500);else loadedLo++;});}
+loSheets.forEach(S=>loadLo(S,false));
 function sheetDist(S,x,z){const[b0,b1,b2,b3]=S.box;const dx=Math.max(b0-x,0,x-b1),dz=Math.max(b2-z,0,z-b3);return Math.hypot(dx,dz);}
 function wantHi(S,cb){if(S.hi){cb&&cb();return;}if(S.hiLoading){if(cb)S.cbs.push(cb);return;}S.hiLoading=true;S.cbs=cb?[cb]:[];
- loader.load(sheetName(S.i,false),t=>{S.hiLoading=false;S.hi=prepTex(t);S.mat.map=t;S.mat.needsUpdate=true;S.cbs.forEach(f=>f());},undefined,()=>{S.hiLoading=false;});}
+ loader.load(sheetName(S.i,false),t=>{S.hiLoading=false;S.hi=prepTex(t);S.mat.map=t;S.mat.needsUpdate=true;S.ready=true;S.cbs.forEach(f=>f());},undefined,()=>{S.hiLoading=false;});}
 function updateQuality(){const near=loSheets.map(S=>({S,d:sheetDist(S,player.x,player.z)})).sort((a,b)=>a.d-b.d);
  near.forEach(({S,d},k)=>{if(d<14&&k<10)wantHi(S);else if(S.hi&&(d>22||k>=14)){if(S.lo){S.mat.map=S.lo;S.mat.needsUpdate=true;}S.hi.dispose();S.hi=null;}});}
 
@@ -373,7 +373,7 @@ $('enter').onclick=()=>{$('overlay').remove();feed(`🏪 ${products.length.toLoc
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 
 /* ---------- loop ---------- */
-const clock=new THREE.Clock();let t=0,qT=0,aT=0;
+const _fr=new THREE.Frustum(),_pm=new THREE.Matrix4();const clock=new THREE.Clock();let t=0,qT=0,aT=0;
 function loop(){const dt=Math.min(clock.getDelta(),0.05);t+=dt;
  yaw+=((keys['arrowleft']?1:0)-(keys['arrowright']?1:0))*dt*2;
  const mx=(keys['d']?1:0)-(keys['a']?1:0)+joy.x,mz=(keys['w']||keys['arrowup']?1:0)-(keys['s']||keys['arrowdown']?1:0)+joy.y;let moving=false;
@@ -389,6 +389,7 @@ function loop(){const dt=Math.min(clock.getDelta(),0.05);t+=dt;
  if(needHover&&mouse&&!ptrs.size&&t-lastHover>0.08){needHover=false;lastHover=t;const h=hitAt(mouse.x,mouse.y);
   if(h){showHL(h.u);tip.textContent=`${h.p.name} · ${h.p.price.toLocaleString()} L`;tip.style.display='block';tip.style.left=Math.min(mouse.x+16,innerWidth-tip.offsetWidth-10)+'px';tip.style.top=(mouse.y+14)+'px';canvas.style.cursor='pointer';}
   else{hideTip();canvas.style.cursor='';if(sel&&sel.u&&sel.u.alive)showHL(sel.u);else hl.visible=false;}}
+ camera.updateMatrixWorld();_pm.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);_fr.setFromProjectionMatrix(_pm);loSheets.forEach(S=>{S.mesh.visible=S.ready&&_fr.intersectsSphere(S.sphere);});
  renderer.render(scene,camera);drawMap();requestAnimationFrame(loop);}
 loop();
 })();
